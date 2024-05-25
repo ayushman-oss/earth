@@ -3,70 +3,134 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Globe with three.js</title>
+    <title>Fireworks Simulation</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
+            background-color: black;
         }
-        canvas {
+        .fireworks-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        .fireworks-canvas {
             display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
         }
     </style>
 </head>
 <body>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+    <div class="fireworks-container">
+        <canvas class="fireworks-canvas" id="fireworksCanvas1" style="z-index: 1;"></canvas>
+        <canvas class="fireworks-canvas" id="fireworksCanvas2" style="z-index: 2;"></canvas>
+        <canvas class="fireworks-canvas" id="fireworksCanvas3" style="z-index: 3;"></canvas>
+    </div>
+
     <script>
-// Create scene, camera, and renderer
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer();
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
+        const canvases = document.querySelectorAll('.fireworks-canvas');
 
-// Add lighting
-const ambientLight = new THREE.AmbientLight(0x404040); // Soft white light
-scene.add(ambientLight);
-const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-directionalLight.position.set(5, 5, 5).normalize();
-scene.add(directionalLight);
+        canvases.forEach((canvas, index) => {
+            const ctx = canvas.getContext('2d');
 
-// Load the Earth texture
-const textureLoader = new THREE.TextureLoader();
-const earthTexture = textureLoader.load('https://threejs.org/examples/textures/earth.jpg', () => {
-    renderer.render(scene, camera);
-});
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            const lim = Math.max(canvas.width, canvas.height);
 
-// Create the sphere geometry
-const geometry = new THREE.SphereGeometry(1, 32, 32);
-const material = new THREE.MeshBasicMaterial({
-    map: earthTexture,
-});
-const sphere = new THREE.Mesh(geometry, material);
-scene.add(sphere);
+            class Firework {
+                constructor(x, y, color) {
+                    this.x = x;
+                    this.y = y;
+                    this.color = color;
+                    this.particles = [];
 
-// Set up the camera position
-camera.position.z = 3;
+                    for (let i = 0; i < lim * 0.04; i++) {
+                        this.particles.push(new Particle(this.x, this.y, this.color));
+                    }
+                }
 
-// Add orbit controls for user interaction
-const controls = new THREE.OrbitControls(camera, renderer.domElement);
+                update() {
+                    for (let i = this.particles.length - 1; i >= 0; i--) {
+                        const p = this.particles[i];
+                        p.update();
+                        if (p.alpha <= 0) {
+                            this.particles.splice(i, 1);
+                        }
+                    }
+                }
 
-// Animate the scene
-function animate() {
-    requestAnimationFrame(animate);
-    controls.update();
-    renderer.render(scene, camera);
-}
+                draw() {
+                    this.particles.forEach(p => p.draw());
+                }
+            }
 
-animate();
+            class Particle {
+                constructor(x, y, color) {
+                    this.x = x;
+                    this.y = y;
+                    this.color = color;
+                    this.speed = Math.random() * lim * 0.004 + 1;
+                    this.angle = Math.random() * 10 * Math.PI;
+                    this.vx = Math.cos(this.angle) * this.speed;
+                    this.vy = Math.sin(this.angle) * this.speed;
+                    this.alpha = 1;
+                    this.decay = Math.random() * 0.03 + 0.01;
+                }
 
-// Handle window resize
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-});
-</script>
+                update() {
+                    this.vx *= 0.98;
+                    this.vy *= 0.98;
+                    this.vy += 0.1; // gravity
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    this.alpha -= this.decay;
+                }
+
+                draw() {
+                    ctx.save();
+                    ctx.globalAlpha = this.alpha;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
+                    ctx.fillStyle = this.color;
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
+
+            const fireworks = [];
+
+            function createFirework() {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                const color = `hsl(${Math.random() * 180}, 100%, 50%)`;
+                fireworks.push(new Firework(x, y, color));
+            }
+
+            function animate() {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                for (let i = fireworks.length - 1; i >= 0; i--) {
+                    const f = fireworks[i];
+                    f.update();
+                    f.draw();
+                    if (f.particles.length === 0) {
+                        fireworks.splice(i, 1);
+                    }
+                }
+
+                if (Math.random() < 0.4) {
+                    createFirework();
+                }
+
+                requestAnimationFrame(animate);
+            }
+
+            animate();
+        });
+    </script>
 </body>
 </html>
